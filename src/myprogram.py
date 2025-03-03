@@ -311,10 +311,10 @@ class MyModel:
         # your code here
         # this particular model has nothing to load, but for demonstration purposes we will load a blank file
         if train:
-          return MyModel(WordNGramLMWithInterpolation(10, [0.01, 0.01, 0.01, 0.02, 0.03, 0.05, 0.17, 0.1, 0.25, 0.35]))
+           return MyModel(WordNGramLMWithInterpolation(10, [0.01, 0.01, 0.01, 0.02, 0.03, 0.05, 0.1, 0.17, 0.25, 0.35]))
         with open(os.path.join(work_dir, 'model.pckl'), 'rb') as f:
-          model = pickle.load(f)
-          f.close()
+           model = pickle.load(f)
+           f.close()
         return MyModel(model)
 
 
@@ -343,10 +343,6 @@ if __name__ == '__main__':
     elif args.mode == 'test':
         print('Loading model')
         model = MyModel.load(args.work_dir, train=False)
-        # print('Loading training data')
-        # train_data = MyModel.load_training_data(args.work_dir)
-        # print('Training')
-        # model.run_train(train_data, args.work_dir)
         print('Loading test data from {}'.format(args.test_data))
         test_data = MyModel.load_test_data(args.test_data)
         print('Making predictions')
