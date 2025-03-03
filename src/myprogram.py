@@ -5,6 +5,7 @@ import random
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import numpy as np
 import pandas as pd
+import pickle
 
 def process_text_for_Ngram(sents, N: int = 2):
 
@@ -36,6 +37,11 @@ class WordNGramLM:
 
     def __init__(self, N: int):
         self.N = N
+        self.counts = {}
+        self.vocab = set()
+        self.total_counts = {}
+        self.all_words = {}
+        self.all_probs = {}
 
     def fit(self, train_data):
 
@@ -48,8 +54,6 @@ class WordNGramLM:
         """
 
         # YOUR CODE HERE
-        self.counts = {}
-        self.vocab = set()
         new_train_data = process_text_for_Ngram(train_data, self.N)
 
         for sentence in new_train_data:
@@ -68,9 +72,6 @@ class WordNGramLM:
               self.counts[key] = {}
               self.counts[key][value] = 1
 
-        self.total_counts = {}
-        self.all_words = {}
-        self.all_probs = {}
         for key in self.counts.keys():
           self.total_counts[key] = np.sum(list(self.counts[key].values()))
           self.all_words[key] = [*self.counts[key]]
@@ -169,6 +170,10 @@ class WordNGramLMWithInterpolation(WordNGramLM):
         # YOUR CODE HERE
         super().__init__(N)
         self.lambdas = lambdas
+        self.wordNGrams = []
+        for n in range(1, self.N + 1):
+          newWordNGram = WordNGramLM(n)
+          self.wordNGrams.append(newWordNGram)
 
     def fit(self, train_data):
 
@@ -181,11 +186,8 @@ class WordNGramLMWithInterpolation(WordNGramLM):
         """
 
         # YOUR CODE HERE
-        self.wordNGrams = []
         for n in range(1, self.N + 1):
-          newWordNGram = WordNGramLM(n)
-          newWordNGram.fit(train_data)
-          self.wordNGrams.append(newWordNGram)
+          self.wordNGrams[n-1].fit(train_data)
 
     def sample_text(self, prefix: str = "<sos>", max_words: int = 100) -> str:
 
@@ -256,10 +258,10 @@ class MyModel:
        self.model = model
 
     @classmethod
-    def load_training_data(cls):
+    def load_training_data(cls, work_dir):
         # your code here
         # this particular model doesn't train
-        df = pd.read_csv('../work/movie_data_no_blanks.csv')
+        df = pd.read_csv(os.path.join(work_dir, 'movie_data_no_blanks.csv'))
         sentences = list(df['sentence'].values)
         new_sentences = []
         for sentence in sentences:
@@ -284,6 +286,7 @@ class MyModel:
 
     def run_train(self, data, work_dir):
         # your code here
+        self.model = WordNGramLMWithInterpolation(10, [0.01, 0.01, 0.01, 0.02, 0.03, 0.05, 0.17, 0.1, 0.25, 0.35])
         self.model.fit(data)
 
     def run_pred(self, data):
@@ -299,16 +302,20 @@ class MyModel:
     def save(self, work_dir):
         # your code here
         # this particular model has nothing to save, but for demonstration purposes we will save a blank file
-        with open(os.path.join(work_dir, 'model.checkpoint'), 'wt') as f:
-            f.write('dummy save')
+        with open(os.path.join(work_dir, 'model.pckl'), 'wb') as f:
+            pickle.dump(self.model, f)
+            f.close()
 
     @classmethod
-    def load(cls, work_dir):
+    def load(cls, work_dir, train):
         # your code here
         # this particular model has nothing to load, but for demonstration purposes we will load a blank file
-        mod = WordNGramLMWithInterpolation(10, [0.01, 0.01, 0.01, 0.02, 0.03, 0.05, 0.17, 0.1, 0.25, 0.35])
-        
-        return MyModel(mod)
+        if train:
+          return MyModel(WordNGramLMWithInterpolation(10, [0.01, 0.01, 0.01, 0.02, 0.03, 0.05, 0.17, 0.1, 0.25, 0.35]))
+        with open(os.path.join(work_dir, 'model.pckl'), 'rb') as f:
+          model = pickle.load(f)
+          f.close()
+        return MyModel(model)
 
 
 if __name__ == '__main__':
@@ -326,20 +333,20 @@ if __name__ == '__main__':
             print('Making working directory {}'.format(args.work_dir))
             os.makedirs(args.work_dir)
         print('Instatiating model')
-        model = MyModel.load(args.work_dir)
+        model = MyModel.load(args.work_dir, train=True)
         print('Loading training data')
-        train_data = MyModel.load_training_data()
+        train_data = MyModel.load_training_data(args.work_dir)
         print('Training')
         model.run_train(train_data, args.work_dir)
         print('Saving model')
         model.save(args.work_dir)
     elif args.mode == 'test':
         print('Loading model')
-        model = MyModel.load(args.work_dir)
-        print('Loading training data')
-        train_data = MyModel.load_training_data()
-        print('Training')
-        model.run_train(train_data, args.work_dir)
+        model = MyModel.load(args.work_dir, train=False)
+        # print('Loading training data')
+        # train_data = MyModel.load_training_data(args.work_dir)
+        # print('Training')
+        # model.run_train(train_data, args.work_dir)
         print('Loading test data from {}'.format(args.test_data))
         test_data = MyModel.load_test_data(args.test_data)
         print('Making predictions')
